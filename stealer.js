@@ -37,7 +37,7 @@
     fetch(webhookURL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
             content: '```json\n' + jsonData.substring(0, 1900) + '\n```'
         })
     }).catch(e => {});
